@@ -6,11 +6,11 @@ use std::collections::HashMap;
 use device::DeviceConfig;
 
 #[derive(serde::Deserialize, Debug)]
-pub(crate) struct Config {
+pub struct Config {
     #[serde(flatten)]
-    pub(crate) schedule: DeviceConfig,
+    schedule: DeviceConfig,
     #[serde(default, flatten)]
-    pub(crate) devices: HashMap<String, DeviceConfig>,
+    devices: HashMap<String, DeviceConfig>,
 }
 
 impl Config {

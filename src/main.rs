@@ -93,14 +93,14 @@ fn main() -> anyhow::Result<()> {
                     .next()
                 {
                     let pid = p.pid();
-                    if let Some(ionice) = schedule.ionice.as_deref() {
+                    if let Some(ionice) = schedule.ionice() {
                         log::debug!("Setting {dev} ionice to {}", ionice);
                         let _ = std::process::Command::new("ionice")
                             .args(["-p", &pid.to_string()])
                             .args(ionice.split(' '))
                             .spawn();
                     }
-                    if let Some(nice) = schedule.nice {
+                    if let Some(nice) = schedule.nice() {
                         log::debug!("Setting {dev} nice to {}", nice);
                         let _ = std::process::Command::new("renice")
                             .args(["-n", &nice.to_string()])

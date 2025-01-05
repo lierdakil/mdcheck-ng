@@ -1,7 +1,7 @@
 use croner::Cron;
 
 #[derive(Debug, Clone)]
-pub(crate) struct ParsedCron(Cron);
+pub struct ParsedCron(Cron);
 
 impl std::ops::Deref for ParsedCron {
     type Target = Cron;

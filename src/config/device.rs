@@ -4,11 +4,11 @@ use super::cron::ParsedCron;
 
 #[derive(serde::Deserialize, Default, Debug)]
 #[serde(default)]
-pub(crate) struct DeviceConfig {
-    pub(crate) start: Option<ParsedCron>,
-    pub(crate) r#continue: Option<ParsedCron>,
-    pub(crate) ionice: Option<String>,
-    pub(crate) nice: Option<i8>,
+pub struct DeviceConfig {
+    start: Option<ParsedCron>,
+    r#continue: Option<ParsedCron>,
+    ionice: Option<String>,
+    nice: Option<i8>,
 }
 
 impl DeviceConfig {
@@ -29,7 +29,7 @@ impl DeviceConfig {
             let time = Local::now();
             cont.is_time_matching(&time).unwrap()
         } else {
-            false
+            self.start()
         }
     }
 
@@ -40,5 +40,13 @@ impl DeviceConfig {
             ionice: self.ionice.clone().or_else(|| other.ionice.clone()),
             nice: self.nice.or(other.nice),
         }
+    }
+
+    pub fn ionice(&self) -> Option<&str> {
+        self.ionice.as_deref()
+    }
+
+    pub fn nice(&self) -> Option<i8> {
+        self.nice
     }
 }
