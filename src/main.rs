@@ -1,11 +1,8 @@
 mod config;
 mod md_dev;
-mod ptr_hash;
+mod renice;
 
 use std::{
-    collections::HashSet,
-    os::unix::ffi::OsStrExt,
-    process::Stdio,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -14,8 +11,18 @@ use std::{
 };
 
 use figment::providers::Format;
-use ptr_hash::PtrHash;
-use sysinfo::{ProcessRefreshKind, RefreshKind};
+
+macro_rules! e {
+    ($expr:expr) => {
+        match $expr {
+            Ok(x) => x,
+            Err(e) => {
+                log::error!("{} failed: {e}", stringify!($expr));
+                Default::default()
+            }
+        }
+    };
+}
 
 fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
@@ -46,95 +53,50 @@ fn main() -> anyhow::Result<()> {
     })
     .expect("Error setting Ctrl-C handler");
 
-    let all_md_devs = md_dev::MdDev::find()?;
+    let mut active_md_devs = Vec::new();
 
-    let mut active_md_devs = HashSet::new();
-
-    for i in &all_md_devs {
-        let dev = i.name();
-        if !matches!(&*i.sync_action()?, "idle") {
+    for md in md_dev::MdDev::find()? {
+        let dev = md.name();
+        if !e!(md.idle()) {
             log::info!("{dev} is busy");
             continue;
         }
         let schedule = config.get(dev);
-        if let Some(state) = i.state()? {
+        if let Some(state) = md.state()? {
             if schedule.resume() {
-                i.resume(state)?;
-                active_md_devs.insert(PtrHash::from(i));
+                if let Err(e) = md.resume(state) {
+                    log::error!("Couldn't resume scrub for {dev}: {e}");
+                } else {
+                    active_md_devs.push(md);
+                }
             }
         } else if schedule.start() {
-            i.start()?;
-            active_md_devs.insert(PtrHash::from(i));
+            if let Err(e) = md.start() {
+                log::error!("Couldn't start scrub for {dev}: {e}");
+            } else {
+                active_md_devs.push(md);
+            }
         }
     }
 
     while !terminated.load(Ordering::Acquire) && !active_md_devs.is_empty() {
-        for i in active_md_devs.clone() {
-            let dev = i.name();
-            if matches!(&*i.sync_action()?, "check") {
+        active_md_devs.retain(|md| {
+            let dev = md.name();
+            let schedule = config.get(dev);
+            if schedule.runs_now() && e!(md.checking()) {
                 log::debug!("{dev} is still checking");
-                if let Some(completed) = i.sync_completed()? {
-                    log::debug!("Save state for {dev}");
-                    i.save_state(completed)?;
-                }
-                let schedule = config.get(dev);
+                let completed = e!(md.sync_completed()).unwrap_or(0);
+                log::debug!("Save state for {dev}");
+                e!(md.save_state(completed));
 
-                // renice the sync process
-                let sys = sysinfo::System::new_with_specifics(
-                    RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing()),
-                );
-                if let Some(p) = sys
-                    .processes_by_exact_name(std::ffi::OsStr::from_bytes(
-                        format!("{dev}_resync").as_bytes(),
-                    ))
-                    .next()
-                {
-                    let pid = p.pid();
-                    if let Some(ionice) = schedule.ionice() {
-                        log::debug!("Setting {dev} ionice to {}", ionice);
-                        let _ = std::process::Command::new("ionice")
-                            .args(["-p", &pid.to_string()])
-                            .args(ionice.split(' '))
-                            .spawn();
-                    }
-                    if let Some(nice) = schedule.nice() {
-                        log::debug!("Setting {dev} nice to {}", nice);
-                        let _ = std::process::Command::new("renice")
-                            .args(["-n", &nice.to_string()])
-                            .args(["-p", &pid.to_string()])
-                            .stdout(Stdio::null())
-                            .spawn();
-                    }
-                }
-
-                if !schedule.runs_now() {
-                    i.stop()?;
-                    active_md_devs.remove(&i);
-                }
+                e!(renice::renice(dev, &schedule));
+                true
             } else {
-                // either finished or went into resync. Either way not our
-                // responsibility any more.
-                log::debug!("Clean state for {dev}");
-                i.clear_state()?;
-                active_md_devs.remove(&i);
+                false
             }
-        }
+        });
         std::thread::park_timeout(Duration::from_secs(120));
     }
 
-    log::info!("Running clean-up");
-
-    // stop any checks that are still running
-    for i in active_md_devs {
-        let dev = i.name();
-        if matches!(&*i.sync_action()?, "check") {
-            log::debug!("{dev} is still checking");
-            i.stop()?;
-        } else {
-            // finished or went into resync since we checked last time.
-            log::debug!("Clean state for {dev}");
-            i.clear_state()?;
-        }
-    }
     Ok(())
 }

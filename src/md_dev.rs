@@ -1,12 +1,39 @@
 use std::path::Path;
 
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MdDev {
     base_path: PathBuf,
     name: String,
     state_path: PathBuf,
+    started_by_us: AtomicBool,
+}
+
+impl Drop for MdDev {
+    fn drop(&mut self) {
+        if self.started_by_us.load(Ordering::Acquire) {
+            let active = match self.checking() {
+                Ok(x) => x,
+                Err(err) => {
+                    log::error!(
+                        "Couldn't get sync_action for {dev}: {err}",
+                        dev = self.name()
+                    );
+                    return;
+                }
+            };
+            if active {
+                if let Err(err) = self.stop() {
+                    log::error!("Failed to stop {dev}: {err}", dev = self.name())
+                }
+            } else if let Err(err) = self.clear_state() {
+                log::error!("Failed to clear state for {dev}: {err}", dev = self.name())
+            }
+        }
+    }
 }
 
 impl MdDev {
@@ -53,6 +80,7 @@ impl MdDev {
 
     pub fn clear_state(&self) -> anyhow::Result<()> {
         if std::fs::exists(&self.state_path)? {
+            log::debug!("Clean state for {dev}", dev = self.name());
             std::fs::remove_file(&self.state_path)?
         }
         Ok(())
@@ -89,6 +117,7 @@ impl MdDev {
         self.set_sync_min(pos)?;
         log::info!("Resuming check of {dev} from {pos}", dev = self.name());
         self.set_sync_action("check")?;
+        self.started_by_us.store(true, Ordering::Release);
         Ok(())
     }
 
@@ -96,7 +125,16 @@ impl MdDev {
         self.set_sync_min(0)?;
         log::info!("Starting check of {dev}", dev = self.name());
         self.set_sync_action("check")?;
+        self.started_by_us.store(true, Ordering::Release);
         Ok(())
+    }
+
+    pub fn checking(&self) -> anyhow::Result<bool> {
+        Ok(matches!(&*self.sync_action()?, "check"))
+    }
+
+    pub fn idle(&self) -> anyhow::Result<bool> {
+        Ok(matches!(&*self.sync_action()?, "idle"))
     }
 
     pub fn stop(&self) -> anyhow::Result<()> {
@@ -111,6 +149,7 @@ impl MdDev {
 
         log::debug!("Stop checking {dev}");
         self.set_sync_action("idle")?;
+        self.started_by_us.store(false, Ordering::Release);
         Ok(())
     }
 
@@ -145,6 +184,7 @@ impl MdDev {
                     .to_str()
                     .ok_or_else(|| anyhow::anyhow!("Couldn't read device name"))?
                     .to_string(),
+                started_by_us: AtomicBool::new(false),
             });
         }
         Ok(result)

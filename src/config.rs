@@ -1,5 +1,5 @@
 pub mod cron;
-mod device;
+pub mod device;
 
 use std::collections::HashMap;
 
