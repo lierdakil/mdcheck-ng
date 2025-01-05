@@ -63,6 +63,7 @@ fn main() -> anyhow::Result<()> {
                 active_md_devs.push(i);
             }
         } else if schedule.start() {
+            i.set_sync_min(0)?;
             log::info!("Starting check of {dev}");
             i.set_sync_action("check")?;
             active_md_devs.push(i);
