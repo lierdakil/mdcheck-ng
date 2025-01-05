@@ -12,18 +12,156 @@ Basically, this takes the same basic approach as mdcheck, steals a few useful
 titbits, namely ionice and renice, from checkarray, and packages this all as a
 Rust flake.
 
-No nixos configuration in the flake at the time of writing, because I was being
+No NixOS configuration in the flake at the time of writing, because I was being
 lazy. PRs welcome.
+
+## Why would I want this?
+
+If you're running mdraid arrays on Linux and they're not periodically scrubbed,
+you should be worried. You'll only find out bitrot happened when you try to read
+the data that's not there anymore. Pray that it's still recoverable by that
+point.
+
+So, that establishes that we want periodic scrubbing. What are our options? A
+few:
+
+- Run `echo check > /sys/block/md*/md/sync_action` in a cron job. This is
+  simple, but not particularly robust and potentially dangerous. For one, for
+  large HDD arrays, this will take a long time, all the while your system will
+  be under heavy I/O load -- so iowait times will skyrocket. Not really ideal.
+  This should not cancel resync if one's happening when the cron job runs,
+  `resync` should take priority over `check`, but I can't guarantee it'll
+  actually work that way every time.
+
+- The aforementioned `checkarray` in a cron job. This script will tune the check
+  process to reduce the overall system impact. You still can observe very high
+  iowait, especially if your machine experiences mildly heavy load during check
+  (e.g. because some search spider decided to crawl your website). Not available
+  in NixOS, but one could certainly hack it in if they were so inclined.
+
+- `mdcheck` script with its associated systemd timers and services. This will
+  pause the check after a configurable delay and restart it according to a
+  systemd timer schedule. The problem is, it makes a lot of assumptions and ends
+  up being rather brittle. This is shipped with `mdadm`, and hence available on
+  NixOS... kind of. The script itself isn't installed, only its units, and the
+  units expect the script to be in `/usr/share`. Also the script itself
+  starts/stops timers which doesn't quite work as expected on NixOS. Also, the
+  script is not particularly robust Bash, shellcheck complains quite a bit.
+
+Overall, my recommendation would be to go with `checkarray` if it's available, and all your arrays are small enough (or fast enough) to check in a few hours.
+
+If you're on NixOS, however, only the first option is really available without
+extra steps (and those steps end up being quite complicated). Hence, this
+project.
+
+The principle aims of this project are thus:
+
+- Run periodic mdraid scrubs.
+- Adjust io-/nice level of the scrub process like `checkarray`.
+- Allow for pause-and-resume like `mdcheck`.
+- Avoid complicated and brittle systemd/cron wrangling.
+- Be as robust as practically feasible.
+
+## Could this just have been a shell script?
+
+Yes. Shell is easier to mess up though, requires more external dependencies, and
+has less options for nice things like TOML configs. I see no strong reason to
+prefer shell, all things considered.
+
+## Basic setup
+
+This is still early days, so I'll just provide a very barebones setup
+instructions here. We'll see about improving these once I run this for a while
+and decide it's worth the trouble.
+
+The basic principle is this: set up the binary to run whenever you might
+potentially want to start/continue scrubbing. Could be via cron or via systemd
+timers. I'll go with the latter option.
+
+Thus, the service:
+
+```ini
+# /etc/systemd/system/mdcheck-ng.service
+[Unit]
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/var/lib/mdcheck-ng
+ExecStart=/path/to/mdcheck-ng /path/to/mdcheck-ng.toml
+```
+
+The timer:
+
+```ini
+# /etc/systemd/system/mdcheck-ng.timer
+[Unit]
+
+[Timer]
+OnCalendar=01:00
+
+[Install]
+WantedBy=timers.target
+```
+
+This will run the service every day at 1 AM. Whether any scrubbing actually
+takes place or not is decided by the config. If no scrubbing is supposed to take
+place, the service will exit immediately, so _make sure_ it's started during `start` and/or `continue` intervals defined in the config.
+
+Beware, however, that the service will happily restart a scrub it may have just
+finished. So avoid starting it more than once within the same activity period
+defined in `start`. This is a rather exotic edge case, mind.
+
+An equivalent NixOS config is thus:
+
+```nix
+{ pkgs, config, lib, ... }:
+let toml = (pkgs.formats.toml {}).generate "mdcheck-ng.toml" {
+      # see Config section for explanation
+      start = "* * 1-7 * * Sun#1";
+      continue = "* * 1-7 * * Sun";
+      ionice = "-c3";
+      nice = 15;
+    };
+in
+lib.mkIf config.boot.swraid.enable {
+  systemd = {
+    timers = {
+      mdcheck-ng = {
+        wantedBy = [ "timers.target" ];
+        timerConfig.OnCalendar = "01:00";
+      };
+      # optionally disable the borked default timers
+      mdcheck_start.enable = false;
+      mdcheck_continue.enable = false;
+    };
+    services.mdcheck-ng = {
+      path = [ pkgs.util-linux ];
+      serviceConfig = {
+        ExecStart =
+          "${mdcheck-ng-flake.packages.x86_64-linux.default}/bin/mdcheck-ng ${toml}";
+        WorkingDirectory = "/var/lib/mdcheck-ng";
+        Type = "oneshot";
+        User = "root";
+      };
+    };
+    tmpfiles.rules = [
+      "d /var/lib/mdcheck-ng 0755 root root -"
+    ];
+  };
+}
+```
 
 ## Config
 
 Config is in TOML format. The fields are:
 
-- `start`: Crontab string defining when a new check will be started, and how
+- `start`: Crontab string defining when a new scrub will be started, and how
   long it will run. The crontab spec MUST include seconds (likely as `*`). If
-  unspecified, no checks are ever started. For example, `"* * 1-6 * * Sun#1"`
-  will start check on the first Sunday of the month, at 1 AM, and will run until
-  6:59:59 AM. Using croner to parse crontab specs, see [the
+  unspecified, no scrubs are ever started. For example, `"* * 1-6 * * Sun#1"`
+  will start a scrub on the first Sunday of the month, at 1 AM, and will run
+  until 6:59:59 AM (approximately, the condition is checked periodically, so it
+  may run slightly over). I'm using croner to parse crontab specs, see [the
   docs](https://docs.rs/croner/latest/croner/#pattern) for more information on
   the allowed syntax.
 - `continue`: Same as `start`, but for continuing checks. This should generally
