@@ -1,15 +1,12 @@
 use std::path::Path;
 
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
-
 #[derive(Debug)]
 pub struct MdDev {
     base_path: PathBuf,
     name: String,
     state_path: PathBuf,
-    started_by_us: AtomicBool,
+    started_by_us: bool,
 }
 
 impl Drop for MdDev {
@@ -113,24 +110,24 @@ impl MdDev {
         Self::write(&self.base_path, "sync_action", data)
     }
 
-    pub fn resume(&self, pos: usize) -> anyhow::Result<()> {
+    pub fn resume(&mut self, pos: usize) -> anyhow::Result<()> {
         self.set_sync_min(pos)?;
         log::info!("Resuming check of {dev} from {pos}", dev = self.name());
         self.set_sync_action("check")?;
-        self.started_by_us.store(true, Ordering::Release);
+        self.started_by_us = true;
         Ok(())
     }
 
-    pub fn start(&self) -> anyhow::Result<()> {
+    pub fn start(&mut self) -> anyhow::Result<()> {
         self.set_sync_min(0)?;
         log::info!("Starting check of {dev}", dev = self.name());
         self.set_sync_action("check")?;
-        self.started_by_us.store(true, Ordering::Release);
+        self.started_by_us = true;
         Ok(())
     }
 
     pub fn is_ours(&self) -> bool {
-        self.started_by_us.load(Ordering::Acquire)
+        self.started_by_us
     }
 
     pub fn checking(&self) -> anyhow::Result<bool> {
@@ -141,7 +138,7 @@ impl MdDev {
         Ok(matches!(&*self.sync_action()?, "idle"))
     }
 
-    pub fn stop(&self) -> anyhow::Result<()> {
+    pub fn stop(&mut self) -> anyhow::Result<()> {
         let dev = self.name();
         if let Some(completed) = self.sync_completed()? {
             log::debug!("Save state for {dev}");
@@ -153,7 +150,7 @@ impl MdDev {
 
         log::debug!("Stop checking {dev}");
         self.set_sync_action("idle")?;
-        self.started_by_us.store(false, Ordering::Release);
+        self.started_by_us = false;
         Ok(())
     }
 
@@ -188,7 +185,7 @@ impl MdDev {
                     .to_str()
                     .ok_or_else(|| anyhow::anyhow!("Couldn't read device name"))?
                     .to_string(),
-                started_by_us: AtomicBool::new(false),
+                started_by_us: false,
             });
         }
         Ok(result)

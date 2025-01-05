@@ -55,7 +55,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut active_md_devs: Vec<_> = md_dev::MdDev::find()?
         .into_iter()
-        .filter_map(|md| {
+        .filter_map(|mut md| {
             let dev = md.name();
             if !e!(md.idle()) {
                 log::info!("{dev} is busy");
@@ -72,12 +72,12 @@ fn main() -> anyhow::Result<()> {
             if let Some(state) = state {
                 if schedule.resume() {
                     if let Err(e) = md.resume(state) {
-                        log::error!("Couldn't resume scrub for {dev}: {e}");
+                        log::error!("Couldn't resume scrub for {}: {e}", md.name());
                     }
                 }
             } else if schedule.start() {
                 if let Err(e) = md.start() {
-                    log::error!("Couldn't start scrub for {dev}: {e}");
+                    log::error!("Couldn't start scrub for {}: {e}", md.name());
                 }
             }
             md.is_ours().then_some(md)
