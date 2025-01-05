@@ -85,6 +85,35 @@ impl MdDev {
         Self::write(&self.base_path, "sync_action", data)
     }
 
+    pub fn resume(&self, pos: usize) -> anyhow::Result<()> {
+        self.set_sync_min(pos)?;
+        log::info!("Resuming check of {dev} from {pos}", dev = self.name());
+        self.set_sync_action("check")?;
+        Ok(())
+    }
+
+    pub fn start(&self) -> anyhow::Result<()> {
+        self.set_sync_min(0)?;
+        log::info!("Starting check of {dev}", dev = self.name());
+        self.set_sync_action("check")?;
+        Ok(())
+    }
+
+    pub fn stop(&self) -> anyhow::Result<()> {
+        let dev = self.name();
+        if let Some(completed) = self.sync_completed()? {
+            log::debug!("Save state for {dev}");
+            self.save_state(completed)?;
+        } else {
+            log::warn!("Failed to read completion status for {dev}, will save 0 as state");
+            self.save_state(0)?;
+        }
+
+        log::debug!("Stop checking {dev}");
+        self.set_sync_action("idle")?;
+        Ok(())
+    }
+
     pub fn set_sync_min(&self, data: usize) -> anyhow::Result<()> {
         Self::write(&self.base_path, "sync_min", data.to_string())
     }

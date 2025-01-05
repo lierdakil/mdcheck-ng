@@ -13,7 +13,7 @@ pub struct DeviceConfig {
 
 impl DeviceConfig {
     pub fn runs_now(&self) -> bool {
-        self.start() || self.cont()
+        self.start() || self.resume()
     }
 
     pub fn start(&self) -> bool {
@@ -24,7 +24,7 @@ impl DeviceConfig {
             false
         }
     }
-    pub fn cont(&self) -> bool {
+    pub fn resume(&self) -> bool {
         if let Some(cont) = &self.r#continue {
             let time = Local::now();
             cont.is_time_matching(&time).unwrap()

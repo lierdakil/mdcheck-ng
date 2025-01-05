@@ -1,7 +1,9 @@
 mod config;
 mod md_dev;
+mod ptr_hash;
 
 use std::{
+    collections::HashSet,
     os::unix::ffi::OsStrExt,
     process::Stdio,
     sync::{
@@ -12,6 +14,7 @@ use std::{
 };
 
 use figment::providers::Format;
+use ptr_hash::PtrHash;
 use sysinfo::{ProcessRefreshKind, RefreshKind};
 
 fn main() -> anyhow::Result<()> {
@@ -45,7 +48,7 @@ fn main() -> anyhow::Result<()> {
 
     let all_md_devs = md_dev::MdDev::find()?;
 
-    let mut active_md_devs = vec![];
+    let mut active_md_devs = HashSet::new();
 
     for i in &all_md_devs {
         let dev = i.name();
@@ -55,24 +58,18 @@ fn main() -> anyhow::Result<()> {
         }
         let schedule = config.get(dev);
         if let Some(state) = i.state()? {
-            // we can resume where we left off
-            i.set_sync_min(state)?;
-            if schedule.cont() {
-                log::info!("Resuming check of {dev} from {state}");
-                i.set_sync_action("check")?;
-                active_md_devs.push(i);
+            if schedule.resume() {
+                i.resume(state)?;
+                active_md_devs.insert(PtrHash::from(i));
             }
         } else if schedule.start() {
-            i.set_sync_min(0)?;
-            log::info!("Starting check of {dev}");
-            i.set_sync_action("check")?;
-            active_md_devs.push(i);
+            i.start()?;
+            active_md_devs.insert(PtrHash::from(i));
         }
     }
 
-    while !terminated.load(Ordering::Acquire) {
-        let mut cont = false;
-        for i in &active_md_devs {
+    while !terminated.load(Ordering::Acquire) && !active_md_devs.is_empty() {
+        for i in active_md_devs.clone() {
             let dev = i.name();
             if matches!(&*i.sync_action()?, "check") {
                 log::debug!("{dev} is still checking");
@@ -110,17 +107,17 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
 
-                if schedule.runs_now() {
-                    // if at least one device should still be checking, continue
-                    cont |= true;
+                if !schedule.runs_now() {
+                    i.stop()?;
+                    active_md_devs.remove(&i);
                 }
             } else {
+                // either finished or went into resync. Either way not our
+                // responsibility any more.
                 log::debug!("Clean state for {dev}");
                 i.clear_state()?;
+                active_md_devs.remove(&i);
             }
-        }
-        if !cont {
-            break;
         }
         std::thread::park_timeout(Duration::from_secs(120));
     }
@@ -128,21 +125,13 @@ fn main() -> anyhow::Result<()> {
     log::info!("Running clean-up");
 
     // stop any checks that are still running
-    for i in &active_md_devs {
+    for i in active_md_devs {
         let dev = i.name();
         if matches!(&*i.sync_action()?, "check") {
             log::debug!("{dev} is still checking");
-            if let Some(completed) = i.sync_completed()? {
-                log::debug!("Save state for {dev}");
-                i.save_state(completed)?;
-            } else {
-                log::warn!("Failed to read completion status for {dev}, will save 0 as state");
-                i.save_state(0)?;
-            }
-
-            log::debug!("Stop checking {dev}");
-            i.set_sync_action("idle")?;
+            i.stop()?;
         } else {
+            // finished or went into resync since we checked last time.
             log::debug!("Clean state for {dev}");
             i.clear_state()?;
         }
