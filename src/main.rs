@@ -135,6 +135,9 @@ fn main() -> anyhow::Result<()> {
             if let Some(completed) = i.sync_completed()? {
                 log::debug!("Save state for {dev}");
                 i.save_state(completed)?;
+            } else {
+                log::warn!("Failed to read completion status for {dev}, will save 0 as state");
+                i.save_state(0)?;
             }
 
             log::debug!("Stop checking {dev}");
