@@ -14,7 +14,7 @@ pub struct MdDev {
 
 impl Drop for MdDev {
     fn drop(&mut self) {
-        if self.started_by_us.load(Ordering::Acquire) {
+        if self.is_ours() {
             let active = match self.checking() {
                 Ok(x) => x,
                 Err(err) => {
@@ -127,6 +127,10 @@ impl MdDev {
         self.set_sync_action("check")?;
         self.started_by_us.store(true, Ordering::Release);
         Ok(())
+    }
+
+    pub fn is_ours(&self) -> bool {
+        self.started_by_us.load(Ordering::Acquire)
     }
 
     pub fn checking(&self) -> anyhow::Result<bool> {

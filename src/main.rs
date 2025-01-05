@@ -53,31 +53,36 @@ fn main() -> anyhow::Result<()> {
     })
     .expect("Error setting Ctrl-C handler");
 
-    let mut active_md_devs = Vec::new();
-
-    for md in md_dev::MdDev::find()? {
-        let dev = md.name();
-        if !e!(md.idle()) {
-            log::info!("{dev} is busy");
-            continue;
-        }
-        let schedule = config.get(dev);
-        if let Some(state) = md.state()? {
-            if schedule.resume() {
-                if let Err(e) = md.resume(state) {
-                    log::error!("Couldn't resume scrub for {dev}: {e}");
-                } else {
-                    active_md_devs.push(md);
+    let mut active_md_devs: Vec<_> = md_dev::MdDev::find()?
+        .into_iter()
+        .filter_map(|md| {
+            let dev = md.name();
+            if !e!(md.idle()) {
+                log::info!("{dev} is busy");
+                return None;
+            }
+            let schedule = config.get(dev);
+            let state = match md.state() {
+                Ok(x) => x,
+                Err(e) => {
+                    log::error!("Failed to get state for {dev}, skipping it: {e}");
+                    return None;
+                }
+            };
+            if let Some(state) = state {
+                if schedule.resume() {
+                    if let Err(e) = md.resume(state) {
+                        log::error!("Couldn't resume scrub for {dev}: {e}");
+                    }
+                }
+            } else if schedule.start() {
+                if let Err(e) = md.start() {
+                    log::error!("Couldn't start scrub for {dev}: {e}");
                 }
             }
-        } else if schedule.start() {
-            if let Err(e) = md.start() {
-                log::error!("Couldn't start scrub for {dev}: {e}");
-            } else {
-                active_md_devs.push(md);
-            }
-        }
-    }
+            md.is_ours().then_some(md)
+        })
+        .collect();
 
     while !terminated.load(Ordering::Acquire) && !active_md_devs.is_empty() {
         active_md_devs.retain(|md| {
