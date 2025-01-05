@@ -109,7 +109,7 @@ impl MdDev {
             }
             let uuid = MdDev::read(&md_path, "uuid")?;
             result.push(MdDev {
-                state_path: PathBuf::from(format!("/var/lib/mdcheck-ng/state_{uuid}")),
+                state_path: PathBuf::from(format!("state_{uuid}")),
                 base_path: md_path,
                 name: entry
                     .file_name()
