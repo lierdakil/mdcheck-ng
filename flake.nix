@@ -22,7 +22,8 @@
       packages.${system}.default = pkgs.rustPlatform.buildRustPackage {
         pname = manifest.name;
         version = manifest.version;
-        src = pkgs.lib.cleanSource ./.;
+        src = pkgs.lib.sourceFilesBySuffices (pkgs.lib.cleanSource ./.)
+          [ "Cargo.lock" "Cargo.toml" ".rs" ];
         cargoLock.lockFile = ./Cargo.lock;
         nativeBuildInputs = with pkgs; [ pkg-config ];
       };
