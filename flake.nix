@@ -28,5 +28,8 @@
         nativeBuildInputs = with pkgs; [ pkg-config ];
       };
       nixosModules.default = import ./module.nix self;
+      checks.${system} = {
+        module = pkgs.testers.runNixOSTest (import ./test.nix self);
+      };
     };
 }
