@@ -1,7 +1,7 @@
 {
   description = "Controller for mdraid check process";
 
-  outputs = { nixpkgs, ... }:
+  outputs = { self, nixpkgs, ... }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
@@ -26,5 +26,6 @@
         cargoLock.lockFile = ./Cargo.lock;
         nativeBuildInputs = with pkgs; [ pkg-config ];
       };
+      nixosModules.default = import ./module.nix self;
     };
 }
