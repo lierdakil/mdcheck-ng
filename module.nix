@@ -17,7 +17,9 @@ in {
     };
     maxRunDuration = lib.mkOption {
       type = types.nullOr types.str;
-      description = "Maximum run duration";
+      description =
+        "Maximum duration for a single run. Can be used to limit scrub time,
+        instead of specifying ranges in `start` and `continue`";
       default = null;
     };
     global = lib.mkOption {
@@ -37,12 +39,13 @@ in {
           };
           ionice = lib.mkOption {
             type = types.nullOr types.str;
-            description = "ionice CLI arguments specifying ionice class and level";
+            description =
+              "ionice CLI arguments specifying ionice class and level for the scrub process";
             default = null;
           };
           nice = lib.mkOption {
             type = types.nullOr types.ints.s8;
-            description = "ionice CLI arguments specifying ionice class and level";
+            description = "Nice level for the scrub process";
             default = null;
           };
         };
