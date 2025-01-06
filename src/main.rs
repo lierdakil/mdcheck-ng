@@ -7,7 +7,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use figment::providers::Format;
@@ -33,7 +33,7 @@ fn main() -> anyhow::Result<()> {
 
     let config: config::Config = figment::Figment::new()
         .admerge(figment::providers::Toml::file(config_path))
-        .admerge(figment::providers::Env::prefixed("MD_CHECK"))
+        .admerge(figment::providers::Env::prefixed("MD_CHECK__").split("__"))
         .extract()?;
 
     if !config.runs_now() {
@@ -84,7 +84,12 @@ fn main() -> anyhow::Result<()> {
         })
         .collect();
 
-    while !terminated.load(Ordering::Acquire) && !active_md_devs.is_empty() {
+    let start_instant = Instant::now();
+
+    while !terminated.load(Ordering::Acquire)
+        && !active_md_devs.is_empty()
+        && config.below_max_duration(start_instant)
+    {
         active_md_devs.retain(|md| {
             let dev = md.name();
             let schedule = config.get(dev);

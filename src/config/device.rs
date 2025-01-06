@@ -9,6 +9,7 @@ pub struct DeviceConfig {
     r#continue: Option<ParsedCron>,
     ionice: Option<String>,
     nice: Option<i8>,
+    force_run: bool,
 }
 
 impl DeviceConfig {
@@ -17,6 +18,9 @@ impl DeviceConfig {
     }
 
     pub fn start(&self) -> bool {
+        if self.force_run {
+            return true;
+        }
         if let Some(start) = &self.start {
             let time = Local::now();
             start.is_time_matching(&time).unwrap()
@@ -25,6 +29,9 @@ impl DeviceConfig {
         }
     }
     pub fn resume(&self) -> bool {
+        if self.force_run {
+            return true;
+        }
         if let Some(cont) = &self.r#continue {
             let time = Local::now();
             cont.is_time_matching(&time).unwrap()
@@ -39,6 +46,7 @@ impl DeviceConfig {
             r#continue: self.r#continue.clone().or_else(|| other.r#continue.clone()),
             ionice: self.ionice.clone().or_else(|| other.ionice.clone()),
             nice: self.nice.or(other.nice),
+            force_run: self.force_run || other.force_run,
         }
     }
 
