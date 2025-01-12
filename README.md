@@ -112,9 +112,12 @@ defined in `start`. This is a rather exotic edge case, mind.
 The flake provides a NixOS module that does all this, so you can do something like this:
 
 ```nix
-{ config, lib, inputs, ... }:
+{ config, lib, ... }:
 {
-  imports = [ inputs.mdcheck-ng.nixosModules.default ];
+  # NB: this assumes you pass the flake through to the module somehow, there
+  # are many options, the easiest is via specialArgs. You could also just load
+  # the module directly while setting up `nixosConfigurations` instead.
+  imports = [ mdcheck-ng-flake.nixosModules.default ];
   config = lib.mkIf config.boot.swraid.enable {
     services.mdcheck-ng = {
       enable = true;
