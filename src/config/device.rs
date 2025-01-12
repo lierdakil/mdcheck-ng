@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use chrono::Local;
 
 use super::cron::ParsedCron;
@@ -10,6 +12,8 @@ pub struct DeviceConfig {
     ionice: Option<String>,
     nice: Option<i8>,
     force_run: bool,
+    #[serde(default, with = "humantime_serde")]
+    max_run_duration: Option<Duration>,
 }
 
 impl DeviceConfig {
@@ -47,6 +51,7 @@ impl DeviceConfig {
             ionice: self.ionice.clone().or_else(|| other.ionice.clone()),
             nice: self.nice.or(other.nice),
             force_run: self.force_run || other.force_run,
+            max_run_duration: self.max_run_duration.or(other.max_run_duration),
         }
     }
 
@@ -56,5 +61,13 @@ impl DeviceConfig {
 
     pub fn nice(&self) -> Option<i8> {
         self.nice
+    }
+
+    pub fn below_max_duration(&self, started: Instant) -> bool {
+        if let Some(dur) = self.max_run_duration {
+            started.elapsed() <= dur
+        } else {
+            true
+        }
     }
 }

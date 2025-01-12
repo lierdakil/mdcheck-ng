@@ -42,7 +42,9 @@ attribute set of (submodule)
 ```
 {
   md127 = {
-    start = "* * 1-15 * * Sat";
+    continue = "Sat";
+    max_run_duration = "6h";
+    start = "Sat#1";
   };
 }
 ```
@@ -68,7 +70,7 @@ null or string
 
 
 *Example:*
-` "* * 1-15 * * Sun" `
+` "Sun" `
 
 
 
@@ -92,6 +94,32 @@ null or string
 
 *Example:*
 ` "-c2 -n7" `
+
+
+
+## services\.mdcheck-ng\.devices\.\<name>\.max_run_duration
+
+
+
+Maximum duration for a single run\. Used to limit scrub time\.
+Unspecified means unlimited\. Accepts ` humantime ` strings, see
+[https://docs\.rs/humantime/latest/humantime/fn\.parse_duration\.html](https://docs\.rs/humantime/latest/humantime/fn\.parse_duration\.html)
+for the exact syntax\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+` null `
+
+
+
+*Example:*
+` "6h 30m" `
 
 
 
@@ -123,8 +151,9 @@ null or 8 bit signed integer; between -128 and 127 (both inclusive)
 
 
 Cron string to define when a scrub can start, in the croner format\.
-See [https://docs\.rs/croner/latest/croner/\#pattern](https://docs\.rs/croner/latest/croner/\#pattern) for exact syntax, but note that
-seconds are NOT optional\.
+See [https://docs\.rs/croner/latest/croner/\#pattern](https://docs\.rs/croner/latest/croner/\#pattern) for exact syntax\. Any fields not
+specified will be assumed to be ` * `, so you could specify just ` Sun#1 ` to run on the
+first Sunday of the month\.
 
 
 
@@ -139,7 +168,7 @@ null or string
 
 
 *Example:*
-` "* * 1-15 * * Sun#1" `
+` "Sun#1" `
 
 
 
@@ -180,7 +209,7 @@ null or string
 
 
 *Example:*
-` "* * 1-15 * * Sun" `
+` "Sun" `
 
 
 
@@ -204,6 +233,32 @@ null or string
 
 *Example:*
 ` "-c2 -n7" `
+
+
+
+## services\.mdcheck-ng\.global\.max_run_duration
+
+
+
+Maximum duration for a single run\. Used to limit scrub time\.
+Unspecified means unlimited\. Accepts ` humantime ` strings, see
+[https://docs\.rs/humantime/latest/humantime/fn\.parse_duration\.html](https://docs\.rs/humantime/latest/humantime/fn\.parse_duration\.html)
+for the exact syntax\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+` null `
+
+
+
+*Example:*
+` "6h 30m" `
 
 
 
@@ -235,8 +290,9 @@ null or 8 bit signed integer; between -128 and 127 (both inclusive)
 
 
 Cron string to define when a scrub can start, in the croner format\.
-See [https://docs\.rs/croner/latest/croner/\#pattern](https://docs\.rs/croner/latest/croner/\#pattern) for exact syntax, but note that
-seconds are NOT optional\.
+See [https://docs\.rs/croner/latest/croner/\#pattern](https://docs\.rs/croner/latest/croner/\#pattern) for exact syntax\. Any fields not
+specified will be assumed to be ` * `, so you could specify just ` Sun#1 ` to run on the
+first Sunday of the month\.
 
 
 
@@ -251,7 +307,7 @@ null or string
 
 
 *Example:*
-` "* * 1-15 * * Sun#1" `
+` "Sun#1" `
 
 
 
@@ -275,32 +331,6 @@ one of “trace”, “debug”, “info”, “warn”, “error”
 
 *Example:*
 ` "info" `
-
-
-
-## services\.mdcheck-ng\.maxRunDuration
-
-
-
-Maximum duration for a single run\. Can be used to limit scrub time,
-instead of specifying ranges in ` start ` and ` continue `\. Accepts
-` humantime ` strings, see [https://docs\.rs/humantime/latest/humantime/fn\.parse_duration\.html](https://docs\.rs/humantime/latest/humantime/fn\.parse_duration\.html)
-for exact syntax\.
-
-
-
-*Type:*
-null or string
-
-
-
-*Default:*
-` null `
-
-
-
-*Example:*
-` "6h 30m" `
 
 
 

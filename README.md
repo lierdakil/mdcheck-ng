@@ -126,10 +126,11 @@ The flake provides a NixOS module that does all this, so you can do something li
       runSchedule = "01:00";
       logLevel = "info";
       global = {
-        start = "* * 1-7 * * Sun#1";
-        continue = "* * 1-7 * * Sun";
+        start = "Sun#1";
+        continue = "Sun";
         ionice = "-c3";
         nice = 15;
+        max_run_duration = "6h";
       };
     };
     # optionally disable the default borkerd timers; they don't work anyway, so
@@ -148,40 +149,39 @@ Please see [options.md](./options.md) for NixOS module options reference.
 
 Config is in TOML format. The fields are:
 
-- `start`: Crontab string defining when a new scrub will be started, and how
-  long it will run. The crontab spec MUST include seconds (likely as `*`). If
-  unspecified, no scrubs are ever started. For example, `"* * 1-6 * * Sun#1"`
-  will start a scrub on the first Sunday of the month, at 1 AM, and will run
-  until 6:59:59 AM (approximately, the condition is checked periodically, so it
-  may run slightly over). I'm using croner to parse crontab specs, see [the
+- `start`: Crontab string defining when a new scrub will be started. Any fields
+  not specified are assumed to be `*`. If `start` is unspecified entirely, no
+  scrubs are ever started. For example, `"Sun#1"` will start a scrub on the
+  first Sunday of the month. This uses croner to parse crontab specs, see [the
   docs](https://docs.rs/croner/latest/croner/#pattern) for more information on
-  the allowed syntax.
+  the exact syntax.
 - `continue`: Same as `start`, but for continuing checks. This should generally
   overlap with `start`, but include other time intervals. If unspecified,
-  defaults to `start`. For example, `"* * 1-6 * * Sun"` will resume checks every
-  Sunday, and will pause them again after 6:59:59 AM.
+  defaults to `start`. For example, `"Sun"` will resume checks every Sunday.
+- `max_run_duration`: Maximum duration for a single run, in [humantime format].
+  Used to limit scrub time per run.
 - `ionice`: part of `ionice` command line to set ionice level on the check
   process. Does nothing if unspecified. For example, "-c3" will set to `idle`
   ionice level.
 - `nice`: what nice level to set the check process to. Does nothing if
   unspecified. For example `15` will set nice level to `15`. Nice level can be
   negative (but generally you don't want that).
-- `max_run_duration`: Maximum duration for a single run, in humantime format.
-  Can be used to limit scrub time instead of `start` and `continue` (in which
-  case, `*` must be used for hours there).
 
-One can specify any of these except `max_run_duration` per md device. For example:
+[humantime format]: https://docs.rs/humantime/latest/humantime/fn.parse_duration.html
+
+One can specify any of these per md device. For example:
 
 ```toml
-start = "* * 1-6 * * Sun#1"
-continue = "* * 1-6 * * Sun"
+start = "Sun#1"
+continue = "Sun"
 ionice = "-c3"
 nice = 15
 
 [md127]
-start = "* * 1-6 * * Sat#1"
-continue = "* * 1-6 * * Sat"
+start = "Sat#1"
+continue = "Sat"
 ionice = "-c2 -n7"
+max_run_duration = "6h"
 ```
 
 will run checks on `md127` on Saturdays instead of Sundays, and with slightly

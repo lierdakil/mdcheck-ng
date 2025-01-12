@@ -17,16 +17,6 @@ in {
       default = "error";
       example = "info";
     };
-    maxRunDuration = lib.mkOption {
-      type = types.nullOr types.str;
-      description =
-        "Maximum duration for a single run. Can be used to limit scrub time,
-        instead of specifying ranges in `start` and `continue`. Accepts
-        `humantime` strings, see <https://docs.rs/humantime/latest/humantime/fn.parse_duration.html>
-        for exact syntax.";
-      default = null;
-      example = "6h 30m";
-    };
     global = lib.mkOption {
       description = "Global options";
       default = {};
@@ -35,16 +25,17 @@ in {
           start = lib.mkOption {
             type = types.nullOr types.str;
             description = "Cron string to define when a scrub can start, in the croner format.
-              See <https://docs.rs/croner/latest/croner/#pattern> for exact syntax, but note that
-              seconds are NOT optional.";
+              See <https://docs.rs/croner/latest/croner/#pattern> for exact syntax. Any fields not
+              specified will be assumed to be `*`, so you could specify just `Sun#1` to run on the
+              first Sunday of the month.";
             default = null;
-            example = "* * 1-15 * * Sun#1";
+            example = "Sun#1";
           };
           continue = lib.mkOption {
             type = types.nullOr types.str;
             description = "Cron string to define when a scrub can continue, in the same format as `start`.";
             default = null;
-            example = "* * 1-15 * * Sun";
+            example = "Sun";
           };
           ionice = lib.mkOption {
             type = types.nullOr types.str;
@@ -59,6 +50,16 @@ in {
             default = null;
             example = 15;
           };
+          max_run_duration = lib.mkOption {
+            type = types.nullOr types.str;
+            description =
+              "Maximum duration for a single run. Used to limit scrub time.
+              Unspecified means unlimited. Accepts `humantime` strings, see
+              <https://docs.rs/humantime/latest/humantime/fn.parse_duration.html>
+              for the exact syntax.";
+            default = null;
+            example = "6h 30m";
+          };
         };
       };
     };
@@ -67,7 +68,11 @@ in {
       description = "Per-device overrides";
       default = {};
       example = {
-        md127.start = "* * 1-15 * * Sat";
+        md127 = {
+          start = "Sat#1";
+          continue = "Sat";
+          max_run_duration = "6h";
+        };
       };
     };
   };
@@ -82,8 +87,7 @@ in {
         ExecStart =
           let filterNull = lib.attrsets.filterAttrs (_: v: v != null);
               config_toml = (pkgs.formats.toml {}).generate "mdcheck-ng.toml"
-                (filterNull ({ max_run_duration = conf.maxRunDuration; } // conf.global) //
-                  lib.attrsets.mapAttrs (_: filterNull) conf.devices);
+                (filterNull conf.global // lib.attrsets.mapAttrs (_: filterNull) conf.devices);
           in "${self.packages.${pkgs.system}.default}/bin/mdcheck-ng ${config_toml}";
         WorkingDirectory = "/var/lib/mdcheck-ng";
         Type = "oneshot";

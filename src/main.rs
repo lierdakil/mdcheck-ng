@@ -86,14 +86,11 @@ fn main() -> anyhow::Result<()> {
 
     let start_instant = Instant::now();
 
-    while !terminated.load(Ordering::Acquire)
-        && !active_md_devs.is_empty()
-        && config.below_max_duration(start_instant)
-    {
+    while !terminated.load(Ordering::Acquire) && !active_md_devs.is_empty() {
         active_md_devs.retain(|md| {
             let dev = md.name();
             let schedule = config.get(dev);
-            if schedule.runs_now() && e!(md.checking()) {
+            if schedule.below_max_duration(start_instant) && e!(md.checking()) {
                 log::debug!("{dev} is still checking");
                 let completed = e!(md.sync_completed()).unwrap_or(0);
                 log::debug!("Save state for {dev}");

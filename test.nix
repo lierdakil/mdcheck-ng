@@ -5,14 +5,15 @@ self:
     imports = [ self.nixosModules.default ];
     services.mdcheck-ng = {
       enable = true;
-      maxRunDuration = "30s";
       logLevel = "trace";
-      global.start = "* * * * * Sun#1";
+      global.start = "Sun#1";
+      global.max_run_duration = "30s";
       devices = {
         md127.nice = 15;
         md127.ionice = "-c3";
         md126.nice = 14;
         md126.ionice = "-c2 -n7";
+        md126.max_run_duration = "12h";
       };
     };
     system.stateVersion = "24.11";
@@ -25,10 +26,11 @@ self:
     out = machine.succeed(f"cat {file}").strip()
     expect = """
     max_run_duration = "30s"
-    start = "* * * * * Sun#1"
+    start = "Sun#1"
 
     [md126]
     ionice = "-c2 -n7"
+    max_run_duration = "12h"
     nice = 14
 
     [md127]
