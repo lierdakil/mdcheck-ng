@@ -26,21 +26,30 @@ jobs:
       if: matrix.target == 'aarch64-unknown-linux-musl'
     - run: rustup target add ${{ matrix.target }}
     - run: cargo build --release --target=${{ matrix.target }}
-    - uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.target }}
-        path: target/${{ matrix.target }}/release/mdcheck-ng
-        if-no-files-found: error
     - run: |
         cp target/${{ matrix.target }}/release/mdcheck-ng ./
         tar jcf mdcheck-ng-${{ matrix.target }}.tar.bz2 mdcheck-ng mdcheck-ng.toml
-    - name: Tag and release
-      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.target }}
+        path: mdcheck-ng-${{ matrix.target }}.tar.bz2
+        if-no-files-found: error
+
+  release:
+    needs: [ build ]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        merge-multiple: true
+    - if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -x
         gh release delete latest --cleanup-tag || true
         gh release create latest \
-          mdcheck-ng-${{ matrix.target }}.tar.bz2 \
+          mdcheck-ng-x86_64-unknown-linux-musl.tar.bz2 \
+          mdcheck-ng-aarch64-unknown-linux-musl.tar.bz2 \
           --title "Latest build"
