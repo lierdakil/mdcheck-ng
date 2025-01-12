@@ -2,7 +2,7 @@
 
 
 
-Whether to enable Enable mdcheck-ng service\.
+Whether to enable mdcheck-ng service\.
 
 
 
