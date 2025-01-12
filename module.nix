@@ -4,7 +4,7 @@ let inherit (lib) types;
     conf = config.services.mdcheck-ng;
 in {
   options.services.mdcheck-ng = rec {
-    enable = lib.mkEnableOption "Enable mdcheck-ng service";
+    enable = lib.mkEnableOption "mdcheck-ng service";
     runSchedule = lib.mkOption {
       type = types.str;
       description = "When to run the service. Must fall within start and continue. Systemd OnCalendar format.";
