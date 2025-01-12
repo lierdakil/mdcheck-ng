@@ -2,51 +2,48 @@
   description = "Controller for mdraid check process";
 
   outputs = { self, nixpkgs, ... }:
-    let
-      system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; };
-      manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
-    in
-    {
-      devShells.${system}.default = with pkgs; mkShell {
-        buildInputs = [
-          rustc
-          cargo
-          clippy
-          rust-analyzer
-          rustfmt
-        ];
-        # Environment variables
-        RUST_SRC_PATH = rustPlatform.rustLibSrc;
-      };
-      packages.${system} = {
-        default = pkgs.rustPlatform.buildRustPackage {
-          pname = manifest.name;
-          version = manifest.version;
-          src = pkgs.lib.sourceFilesBySuffices (pkgs.lib.cleanSource ./.)
-            [ "Cargo.lock" "Cargo.toml" ".rs" ];
-          cargoLock.lockFile = ./Cargo.lock;
-          nativeBuildInputs = with pkgs; [ pkg-config ];
-        };
-        doc =
-          let eval = pkgs.lib.evalModules {
-                modules = [
-                  {
-                    options._module.args = pkgs.lib.mkOption { internal = true; };
-                    config._module.args = { inherit pkgs; };
-                    config._module.check = false;
-                  }
-                  self.nixosModules.default
-                ];
+    let systems = ["x86_64-linux" "aarch64-linux"];
+        base = { nixosModules.default = import ./module.nix self; };
+        per-system = system:
+          let pkgs = nixpkgs.legacyPackages.${system};
+          in {
+            devShells.${system}.default = with pkgs; mkShell {
+              buildInputs = [
+                rustc
+                cargo
+                clippy
+                rust-analyzer
+                rustfmt
+              ];
+              # Environment variables
+              RUST_SRC_PATH = rustPlatform.rustLibSrc;
+            };
+            packages.${system} = let manifest = (pkgs.lib.importTOML ./Cargo.toml).package; in {
+              default = pkgs.rustPlatform.buildRustPackage {
+                pname = manifest.name;
+                version = manifest.version;
+                src = pkgs.lib.sourceFilesBySuffices (pkgs.lib.cleanSource ./.)
+                  [ "Cargo.lock" "Cargo.toml" ".rs" ];
+                cargoLock.lockFile = ./Cargo.lock;
+                nativeBuildInputs = with pkgs; [ pkg-config ];
               };
-          in
-            (pkgs.nixosOptionsDoc {
-              inherit (eval) options;
-            }).optionsCommonMark;
-      };
-      nixosModules.default = import ./module.nix self;
-      checks.${system} = {
-        module = pkgs.testers.runNixOSTest (import ./test.nix self);
-      };
-    };
+              doc =
+                let eval = pkgs.lib.evalModules {
+                      modules = [
+                        {
+                          options._module.args = pkgs.lib.mkOption { internal = true; };
+                          config._module.args = { inherit pkgs; };
+                          config._module.check = false;
+                        }
+                        self.nixosModules.default
+                      ];
+                    };
+                in (pkgs.nixosOptionsDoc { inherit (eval) options;}).optionsCommonMark;
+            };
+            checks.${system} = {
+              module = pkgs.testers.runNixOSTest (import ./test.nix self);
+            };
+          };
+          inherit (nixpkgs.lib) recursiveUpdate map fold;
+    in fold recursiveUpdate base (map per-system systems);
 }
