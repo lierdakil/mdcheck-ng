@@ -12,9 +12,6 @@ Basically, this takes the same basic approach as mdcheck, steals a few useful
 titbits, namely ionice and renice, from checkarray, and packages this all as a
 Rust flake.
 
-No NixOS configuration in the flake at the time of writing, because I was being
-lazy. PRs welcome.
-
 ## Why would I want this?
 
 If you're running mdraid arrays on Linux and they're not periodically scrubbed,
@@ -112,45 +109,35 @@ Beware, however, that the service will happily restart a scrub it may have just
 finished. So avoid starting it more than once within the same activity period
 defined in `start`. This is a rather exotic edge case, mind.
 
-An equivalent NixOS config is thus:
+The flake provides a NixOS module that does all this, so you can do something like this:
 
 ```nix
-{ pkgs, config, lib, ... }:
-let toml = (pkgs.formats.toml {}).generate "mdcheck-ng.toml" {
-      # see Config section for explanation
-      start = "* * 1-7 * * Sun#1";
-      continue = "* * 1-7 * * Sun";
-      ionice = "-c3";
-      nice = 15;
-    };
-in
-lib.mkIf config.boot.swraid.enable {
-  systemd = {
-    timers = {
-      mdcheck-ng = {
-        wantedBy = [ "timers.target" ];
-        timerConfig.OnCalendar = "01:00";
+{ config, lib, inputs, ... }:
+{
+  imports = [ inputs.mdcheck-ng.nixosModules.default ];
+  config = lib.mkIf config.boot.swraid.enable {
+    services.mdcheck-ng = {
+      enable = true;
+      runSchedule = "01:00";
+      logLevel = "info";
+      global = {
+        start = "* * 1-7 * * Sun#1";
+        continue = "* * 1-7 * * Sun";
+        ionice = "-c3";
+        nice = 15;
       };
-      # optionally disable the borked default timers
+    };
+    # optionally disable the default borkerd timers; they don't work anyway, so
+    # might as well.
+    systemd.timers = {
       mdcheck_start.enable = false;
       mdcheck_continue.enable = false;
     };
-    services.mdcheck-ng = {
-      path = [ pkgs.util-linux ];
-      serviceConfig = {
-        ExecStart =
-          "${mdcheck-ng-flake.packages.x86_64-linux.default}/bin/mdcheck-ng ${toml}";
-        WorkingDirectory = "/var/lib/mdcheck-ng";
-        Type = "oneshot";
-        User = "root";
-      };
-    };
-    tmpfiles.rules = [
-      "d /var/lib/mdcheck-ng 0755 root root -"
-    ];
   };
 }
 ```
+
+Please see [options.md](./options.md) for NixOS module options reference.
 
 ## Config
 
@@ -174,8 +161,11 @@ Config is in TOML format. The fields are:
 - `nice`: what nice level to set the check process to. Does nothing if
   unspecified. For example `15` will set nice level to `15`. Nice level can be
   negative (but generally you don't want that).
+- `max_run_duration`: Maximum duration for a single run, in humantime format.
+  Can be used to limit scrub time instead of `start` and `continue` (in which
+  case, `*` must be used for hours there).
 
-One can specify any of these per md device. For example:
+One can specify any of these except `max_run_duration` per md device. For example:
 
 ```toml
 start = "* * 1-6 * * Sun#1"
