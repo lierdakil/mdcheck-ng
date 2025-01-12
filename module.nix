@@ -7,20 +7,25 @@ in {
     enable = lib.mkEnableOption "Enable mdcheck-ng service";
     runSchedule = lib.mkOption {
       type = types.str;
-      description = "When to run the service. Must fall within start and continue";
+      description = "When to run the service. Must fall within start and continue. Systemd OnCalendar format.";
       default = "daily";
+      example = "Sun *-*-* 01:00";
     };
     logLevel = lib.mkOption {
       type = types.enum [ "trace" "debug" "info" "warn" "error" ];
       description = "Log level";
       default = "error";
+      example = "info";
     };
     maxRunDuration = lib.mkOption {
       type = types.nullOr types.str;
       description =
         "Maximum duration for a single run. Can be used to limit scrub time,
-        instead of specifying ranges in `start` and `continue`";
+        instead of specifying ranges in `start` and `continue`. Accepts
+        `humantime` strings, see <https://docs.rs/humantime/latest/humantime/fn.parse_duration.html>
+        for exact syntax.";
       default = null;
+      example = "6h 30m";
     };
     global = lib.mkOption {
       description = "Global options";
@@ -29,24 +34,30 @@ in {
         options = {
           start = lib.mkOption {
             type = types.nullOr types.str;
-            description = "Cron string to define when a scrub can start";
+            description = "Cron string to define when a scrub can start, in the croner format.
+              See <https://docs.rs/croner/latest/croner/#pattern> for exact syntax, but note that
+              seconds are NOT optional.";
             default = null;
+            example = "* * 1-15 * * Sun#1";
           };
           continue = lib.mkOption {
             type = types.nullOr types.str;
-            description = "Cron string to define when a scrub can continue";
+            description = "Cron string to define when a scrub can continue, in the same format as `start`.";
             default = null;
+            example = "* * 1-15 * * Sun";
           };
           ionice = lib.mkOption {
             type = types.nullOr types.str;
             description =
               "ionice CLI arguments specifying ionice class and level for the scrub process";
             default = null;
+            example = "-c2 -n7";
           };
           nice = lib.mkOption {
             type = types.nullOr types.ints.s8;
             description = "Nice level for the scrub process";
             default = null;
+            example = 15;
           };
         };
       };
@@ -55,6 +66,9 @@ in {
       type = types.attrsOf global.type;
       description = "Per-device overrides";
       default = {};
+      example = {
+        md127.start = "* * 1-15 * * Sat";
+      };
     };
   };
   config = lib.mkIf conf.enable {
