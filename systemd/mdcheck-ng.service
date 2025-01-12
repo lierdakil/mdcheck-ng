@@ -1,0 +1,8 @@
+[Unit]
+Description="Controller for mdraid check process"
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/var/lib/mdcheck-ng
+ExecStart=/path/to/mdcheck-ng /path/to/mdcheck-ng.toml

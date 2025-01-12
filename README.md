@@ -95,11 +95,13 @@ The timer:
 [Unit]
 
 [Timer]
-OnCalendar=01:00
+OnCalendar=daily
 
 [Install]
 WantedBy=timers.target
 ```
+
+The example units are available in the repo in `./systemd/`.
 
 This will run the service every day at 1 AM. Whether any scrubbing actually
 takes place or not is decided by the config. If no scrubbing is supposed to take
