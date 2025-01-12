@@ -25,6 +25,9 @@ jobs:
     - run: sudo apt install gcc-aarch64-linux-gnu
       if: matrix.target == 'aarch64-unknown-linux-musl'
     - run: rustup target add ${{ matrix.target }}
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ matrix.target }}
     - run: cargo build --release --target=${{ matrix.target }}
     - run: |
         cp target/${{ matrix.target }}/release/mdcheck-ng ./
