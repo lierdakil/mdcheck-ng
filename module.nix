@@ -38,14 +38,30 @@ in {
             example = "Sun";
           };
           ionice = lib.mkOption {
-            type = types.nullOr types.str;
+            type =
+              let idle = types.enum [ "idle" ];
+                  besteffort = types.submodule {
+                    options = {
+                      best_effort = lib.mkOption {
+                        type = types.ints.between 0 7;
+                      };
+                    };
+                  };
+                  realtime = types.submodule {
+                    options = {
+                      realtime = lib.mkOption {
+                        type = types.ints.between 0 7;
+                      };
+                    };
+                  };
+              in types.nullOr (types.oneOf [ idle besteffort realtime ]);
             description =
-              "ionice CLI arguments specifying ionice class and level for the scrub process";
+              ''Either `"idle"`, or `{ best_effort = lvl; }`, or `{ realtime = lvl; }`, where lvl is between 0 and 7'';
             default = null;
             example = "-c2 -n7";
           };
           nice = lib.mkOption {
-            type = types.nullOr types.ints.s8;
+            type = types.nullOr (types.ints.between (-20) 19);
             description = "Nice level for the scrub process";
             default = null;
             example = 15;
@@ -82,7 +98,6 @@ in {
       timerConfig.OnCalendar = conf.runSchedule;
     };
     systemd.services.mdcheck-ng = {
-      path = [ pkgs.util-linux ];
       serviceConfig = {
         ExecStart =
           let filterNull = lib.attrsets.filterAttrs (_: v: v != null);

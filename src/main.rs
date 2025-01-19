@@ -12,6 +12,7 @@ use std::{
 
 use figment::providers::Format;
 
+#[macro_export]
 macro_rules! e {
     ($expr:expr) => {
         match $expr {

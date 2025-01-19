@@ -1,6 +1,5 @@
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
-use std::process::Stdio;
 
 use sysinfo::ProcessRefreshKind;
 use sysinfo::RefreshKind;
@@ -18,19 +17,23 @@ pub fn renice(dev: &str, schedule: &DeviceConfig) -> anyhow::Result<()> {
     {
         let pid = p.pid();
         if let Some(ionice) = schedule.ionice() {
-            log::debug!("Setting {dev} ionice to {}", ionice);
-            let _ = std::process::Command::new("ionice")
-                .args(["-p", &pid.to_string()])
-                .args(ionice.split(' '))
-                .spawn();
+            log::debug!("Setting {dev} ionice to {:?}", ionice);
+            let tgt = ioprio::Target::Process(ioprio::Pid::from_raw(pid.as_u32() as i32));
+            let prio = crate::e!(ioprio::get_priority(tgt));
+            let new_prio = ioprio::Priority::new(*ionice);
+            if prio != new_prio {
+                crate::e!(ioprio::set_priority(tgt, new_prio));
+            }
         }
         if let Some(nice) = schedule.nice() {
             log::debug!("Setting {dev} nice to {}", nice);
-            let _ = std::process::Command::new("renice")
-                .args(["-n", &nice.to_string()])
-                .args(["-p", &pid.to_string()])
-                .stdout(Stdio::null())
-                .spawn();
+            let nice = i32::from(nice);
+            if let Some(rpid) = rustix::process::Pid::from_raw(pid.as_u32() as i32) {
+                let cur_nice = crate::e!(rustix::process::getpriority_process(Some(rpid)));
+                if nice != cur_nice {
+                    crate::e!(rustix::process::setpriority_process(Some(rpid), nice));
+                }
+            }
         }
     }
     Ok(())

@@ -4,12 +4,71 @@ use chrono::Local;
 
 use super::cron::ParsedCron;
 
+use ioprio::{BePriorityLevel, Class as IoPrioClass, RtPriorityLevel};
+
+#[derive(serde::Deserialize)]
+#[serde(remote = "IoPrioClass")]
+enum IoPrioClassDef {
+    #[serde(alias = "realtime")]
+    Realtime(#[serde(with = "RtPriorityLevelDef")] RtPriorityLevel),
+    #[serde(alias = "best_effort")]
+    BestEffort(#[serde(with = "BePriorityLevelDef")] BePriorityLevel),
+    #[serde(alias = "idle")]
+    Idle,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(remote = "RtPriorityLevel")]
+struct RtPriorityLevelDef(#[serde(getter = "RtPriorityLevel::level")] u8);
+
+impl From<RtPriorityLevelDef> for RtPriorityLevel {
+    fn from(value: RtPriorityLevelDef) -> Self {
+        Self::from_level(value.0).expect("Realtime level out of bounds")
+    }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(remote = "BePriorityLevel")]
+struct BePriorityLevelDef(#[serde(getter = "BePriorityLevel::level")] u8);
+
+impl From<BePriorityLevelDef> for BePriorityLevel {
+    fn from(value: BePriorityLevelDef) -> Self {
+        Self::from_level(value.0).expect("BestEffort level out of bounds")
+    }
+}
+
+#[derive(serde::Deserialize, Default, Debug, Clone)]
+enum MaybeIoPrioClass {
+    #[default]
+    Nothing,
+    #[serde(untagged)]
+    Just(#[serde(with = "IoPrioClassDef")] IoPrioClass),
+}
+
+impl MaybeIoPrioClass {
+    fn or_else(self, other: impl FnOnce() -> Self) -> Self {
+        match self {
+            MaybeIoPrioClass::Just(_) => self,
+            MaybeIoPrioClass::Nothing => other(),
+        }
+    }
+}
+
+impl From<MaybeIoPrioClass> for Option<IoPrioClass> {
+    fn from(value: MaybeIoPrioClass) -> Self {
+        match value {
+            MaybeIoPrioClass::Just(class) => Some(class),
+            MaybeIoPrioClass::Nothing => None,
+        }
+    }
+}
+
 #[derive(serde::Deserialize, Default, Debug)]
 #[serde(default)]
 pub struct DeviceConfig {
     start: Option<ParsedCron>,
     r#continue: Option<ParsedCron>,
-    ionice: Option<String>,
+    ionice: MaybeIoPrioClass,
     nice: Option<i8>,
     force_run: bool,
     #[serde(default, with = "humantime_serde")]
@@ -55,8 +114,11 @@ impl DeviceConfig {
         }
     }
 
-    pub fn ionice(&self) -> Option<&str> {
-        self.ionice.as_deref()
+    pub fn ionice(&self) -> Option<&IoPrioClass> {
+        match &self.ionice {
+            MaybeIoPrioClass::Just(class) => Some(class),
+            MaybeIoPrioClass::Nothing => None,
+        }
     }
 
     pub fn nice(&self) -> Option<i8> {

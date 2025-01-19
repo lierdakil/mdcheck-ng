@@ -128,7 +128,7 @@ The flake provides a NixOS module that does all this, so you can do something li
       global = {
         start = "Sun#1";
         continue = "Sun";
-        ionice = "-c3";
+        ionice = "idle";
         nice = 15;
         max_run_duration = "6h";
       };
@@ -160,9 +160,10 @@ Config is in TOML format. The fields are:
   defaults to `start`. For example, `"Sun"` will resume checks every Sunday.
 - `max_run_duration`: Maximum duration for a single run, in [humantime format].
   Used to limit scrub time per run.
-- `ionice`: part of `ionice` command line to set ionice level on the check
-  process. Does nothing if unspecified. For example, "-c3" will set to `idle`
-  ionice level.
+- `ionice`: IO nice level. Can have one of three forms:
+    - `ionice = "idle"`,
+    - `ionice.best_effort = lvl` where `lvl` is `0` to `7`,
+    - `ionice.realtime = lvl` where `lvl` is `0` to `7`,
 - `nice`: what nice level to set the check process to. Does nothing if
   unspecified. For example `15` will set nice level to `15`. Nice level can be
   negative (but generally you don't want that).
@@ -174,13 +175,13 @@ One can specify any of these per md device. For example:
 ```toml
 start = "Sun#1"
 continue = "Sun"
-ionice = "-c3"
+ionice = "idle"
 nice = 15
 
 [md127]
 start = "Sat#1"
 continue = "Sat"
-ionice = "-c2 -n7"
+ionice.best_effort = 7
 max_run_duration = "6h"
 ```
 

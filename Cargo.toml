@@ -10,8 +10,10 @@ croner = "2.1.0"
 ctrlc = { version = "3.4.5", features = ["termination"] }
 figment = { version = "0.10.19", features = ["env", "toml"] }
 humantime-serde = "1.1.1"
+ioprio = "0.2.0"
 log = "0.4.22"
 pretty_env_logger = "0.5.0"
+rustix = { version = "0.38.43", features = ["process"] }
 serde = { version = "1.0.217", features = ["derive"] }
 sysinfo = { version = "0.33.1", default-features = false, features = ["system"] }
 

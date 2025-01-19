@@ -1,5 +1,5 @@
 start = "Sun#1"
 continue = "Sun"
-ionice = "-c3"
+ionice.best_effort = 7
 nice = 15
 max_run_duration = "6h"

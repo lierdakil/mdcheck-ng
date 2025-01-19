@@ -10,9 +10,9 @@ self:
       global.max_run_duration = "30s";
       devices = {
         md127.nice = 15;
-        md127.ionice = "-c3";
+        md127.ionice = "idle";
         md126.nice = 14;
-        md126.ionice = "-c2 -n7";
+        md126.ionice.best_effort = 7;
         md126.max_run_duration = "12h";
       };
     };
@@ -29,12 +29,13 @@ self:
     start = "Sun#1"
 
     [md126]
-    ionice = "-c2 -n7"
     max_run_duration = "12h"
     nice = 14
+    [md126.ionice]
+    best_effort = 7
 
     [md127]
-    ionice = "-c3"
+    ionice = "idle"
     nice = 15
     """.strip()
     print(machine.succeed(f"diff -u <(echo '{expect}') <(echo '{out}')"))
