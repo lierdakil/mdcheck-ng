@@ -98,6 +98,7 @@ in {
       timerConfig.OnCalendar = conf.runSchedule;
     };
     systemd.services.mdcheck-ng = {
+      restartIfChanged = false;
       serviceConfig = {
         ExecStart =
           let filterNull = lib.attrsets.filterAttrs (_: v: v != null);
