@@ -6,8 +6,8 @@
         base = { nixosModules.default = import ./module.nix self; };
         per-system = system:
           let pkgs = nixpkgs.legacyPackages.${system};
-          in {
-            devShells.${system}.default = with pkgs; mkShell {
+          in builtins.mapAttrs (_: v: { ${system} = v; }) {
+            devShells.default = with pkgs; mkShell {
               buildInputs = [
                 rustc
                 cargo
@@ -18,7 +18,7 @@
               # Environment variables
               RUST_SRC_PATH = rustPlatform.rustLibSrc;
             };
-            packages.${system} = let manifest = (pkgs.lib.importTOML ./Cargo.toml).package; in {
+            packages = let manifest = (pkgs.lib.importTOML ./Cargo.toml).package; in {
               default = pkgs.rustPlatform.buildRustPackage {
                 pname = manifest.name;
                 version = manifest.version;
@@ -40,7 +40,7 @@
                     };
                 in (pkgs.nixosOptionsDoc { inherit (eval) options;}).optionsCommonMark;
             };
-            checks.${system} = {
+            checks = {
               module = pkgs.testers.runNixOSTest (import ./test.nix self);
             };
           };
