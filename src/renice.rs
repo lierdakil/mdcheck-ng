@@ -17,20 +17,20 @@ pub fn renice(dev: &str, schedule: &DeviceConfig) -> anyhow::Result<()> {
     {
         let pid = p.pid();
         if let Some(ionice) = schedule.ionice() {
-            log::debug!("Setting {dev} ionice to {:?}", ionice);
             let tgt = ioprio::Target::Process(ioprio::Pid::from_raw(pid.as_u32() as i32));
             let prio = crate::e!(ioprio::get_priority(tgt));
             let new_prio = ioprio::Priority::new(*ionice);
             if prio != new_prio {
+                log::debug!("Setting {dev} ionice to {:?}", ionice);
                 crate::e!(ioprio::set_priority(tgt, new_prio));
             }
         }
         if let Some(nice) = schedule.nice() {
-            log::debug!("Setting {dev} nice to {}", nice);
             let nice = i32::from(nice);
             if let Some(rpid) = rustix::process::Pid::from_raw(pid.as_u32() as i32) {
                 let cur_nice = crate::e!(rustix::process::getpriority_process(Some(rpid)));
                 if nice != cur_nice {
+                    log::debug!("Setting {dev} nice to {}", nice);
                     crate::e!(rustix::process::setpriority_process(Some(rpid), nice));
                 }
             }
