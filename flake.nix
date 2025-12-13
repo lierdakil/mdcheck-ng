@@ -44,6 +44,6 @@
               module = pkgs.testers.runNixOSTest (import ./test.nix self);
             };
           };
-          inherit (nixpkgs.lib) recursiveUpdate map fold;
-    in fold recursiveUpdate base (map per-system systems);
+          inherit (nixpkgs.lib) recursiveUpdate map foldr;
+    in foldr recursiveUpdate base (map per-system systems);
 }

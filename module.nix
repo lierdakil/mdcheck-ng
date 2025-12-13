@@ -104,7 +104,7 @@ in {
           let filterNull = lib.attrsets.filterAttrs (_: v: v != null);
               config_toml = (pkgs.formats.toml {}).generate "mdcheck-ng.toml"
                 (filterNull conf.global // lib.attrsets.mapAttrs (_: filterNull) conf.devices);
-          in "${self.packages.${pkgs.system}.default}/bin/mdcheck-ng ${config_toml}";
+          in "${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/mdcheck-ng ${config_toml}";
         WorkingDirectory = "/var/lib/mdcheck-ng";
         Type = "oneshot";
         User = "root";
