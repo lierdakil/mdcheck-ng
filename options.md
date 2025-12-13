@@ -78,12 +78,12 @@ null or string
 
 
 
-ionice CLI arguments specifying ionice class and level for the scrub process
+Either ` "idle" `, or ` { best_effort = lvl; } `, or ` { realtime = lvl; } `, where lvl is between 0 and 7
 
 
 
 *Type:*
-null or string
+null or value “idle” (singular enum) or (submodule) or (submodule)
 
 
 
@@ -132,7 +132,7 @@ Nice level for the scrub process
 
 
 *Type:*
-null or 8 bit signed integer; between -128 and 127 (both inclusive)
+null or integer between -20 and 19 (both inclusive)
 
 
 
@@ -217,12 +217,12 @@ null or string
 
 
 
-ionice CLI arguments specifying ionice class and level for the scrub process
+Either ` "idle" `, or ` { best_effort = lvl; } `, or ` { realtime = lvl; } `, where lvl is between 0 and 7
 
 
 
 *Type:*
-null or string
+null or value “idle” (singular enum) or (submodule) or (submodule)
 
 
 
@@ -271,7 +271,7 @@ Nice level for the scrub process
 
 
 *Type:*
-null or 8 bit signed integer; between -128 and 127 (both inclusive)
+null or integer between -20 and 19 (both inclusive)
 
 
 
