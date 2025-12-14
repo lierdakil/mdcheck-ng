@@ -1,8 +1,15 @@
 self:
-{pkgs, lib, config, ...}:
-let inherit (lib) types;
-    conf = config.services.mdcheck-ng;
-in {
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
+let
+  inherit (lib) types;
+  conf = config.services.mdcheck-ng;
+in
+{
   options.services.mdcheck-ng = rec {
     enable = lib.mkEnableOption "mdcheck-ng service";
     runSchedule = lib.mkOption {
@@ -12,14 +19,20 @@ in {
       example = "Sun *-*-* 01:00";
     };
     logLevel = lib.mkOption {
-      type = types.enum [ "trace" "debug" "info" "warn" "error" ];
+      type = types.enum [
+        "trace"
+        "debug"
+        "info"
+        "warn"
+        "error"
+      ];
       description = "Log level";
       default = "error";
       example = "info";
     };
     global = lib.mkOption {
       description = "Global options";
-      default = {};
+      default = { };
       type = types.submodule {
         options = {
           start = lib.mkOption {
@@ -39,24 +52,31 @@ in {
           };
           ionice = lib.mkOption {
             type =
-              let idle = types.enum [ "idle" ];
-                  besteffort = types.submodule {
-                    options = {
-                      best_effort = lib.mkOption {
-                        type = types.ints.between 0 7;
-                      };
+              let
+                idle = types.enum [ "idle" ];
+                besteffort = types.submodule {
+                  options = {
+                    best_effort = lib.mkOption {
+                      type = types.ints.between 0 7;
                     };
                   };
-                  realtime = types.submodule {
-                    options = {
-                      realtime = lib.mkOption {
-                        type = types.ints.between 0 7;
-                      };
+                };
+                realtime = types.submodule {
+                  options = {
+                    realtime = lib.mkOption {
+                      type = types.ints.between 0 7;
                     };
                   };
-              in types.nullOr (types.oneOf [ idle besteffort realtime ]);
-            description =
-              ''Either `"idle"`, or `{ best_effort = lvl; }`, or `{ realtime = lvl; }`, where lvl is between 0 and 7'';
+                };
+              in
+              types.nullOr (
+                types.oneOf [
+                  idle
+                  besteffort
+                  realtime
+                ]
+              );
+            description = ''Either `"idle"`, or `{ best_effort = lvl; }`, or `{ realtime = lvl; }`, where lvl is between 0 and 7'';
             default = null;
             example = "-c2 -n7";
           };
@@ -68,8 +88,7 @@ in {
           };
           max_run_duration = lib.mkOption {
             type = types.nullOr types.str;
-            description =
-              "Maximum duration for a single run. Used to limit scrub time.
+            description = "Maximum duration for a single run. Used to limit scrub time.
               Unspecified means unlimited. Accepts `humantime` strings, see
               <https://docs.rs/humantime/latest/humantime/fn.parse_duration.html>
               for the exact syntax.";
@@ -82,7 +101,7 @@ in {
     devices = lib.mkOption {
       type = types.attrsOf global.type;
       description = "Per-device overrides";
-      default = {};
+      default = { };
       example = {
         md127 = {
           start = "Sat#1";
@@ -101,10 +120,13 @@ in {
       restartIfChanged = false;
       serviceConfig = {
         ExecStart =
-          let filterNull = lib.attrsets.filterAttrs (_: v: v != null);
-              config_toml = (pkgs.formats.toml {}).generate "mdcheck-ng.toml"
-                (filterNull conf.global // lib.attrsets.mapAttrs (_: filterNull) conf.devices);
-          in "${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/mdcheck-ng ${config_toml}";
+          let
+            filterNull = lib.attrsets.filterAttrs (_: v: v != null);
+            config_toml = (pkgs.formats.toml { }).generate "mdcheck-ng.toml" (
+              filterNull conf.global // lib.attrsets.mapAttrs (_: filterNull) conf.devices
+            );
+          in
+          "${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/mdcheck-ng ${config_toml}";
         WorkingDirectory = "/var/lib/mdcheck-ng";
         Type = "oneshot";
         User = "root";

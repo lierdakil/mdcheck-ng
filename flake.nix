@@ -1,16 +1,28 @@
 {
   description = "Controller for mdraid check process";
 
-  outputs = { self, nixpkgs, ... }:
-    let systems = ["x86_64-linux" "aarch64-linux"];
-        base = { nixosModules.default = import ./module.nix self; };
-        per-system = system:
-          let pkgs = nixpkgs.legacyPackages.${system};
-          in builtins.mapAttrs (_: v: { ${system} = v; }) {
-            devShells.default = with pkgs; mkShell {
+  outputs =
+    { self, nixpkgs, ... }:
+    let
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      inherit (nixpkgs) lib;
+      per-system =
+        system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ self.overlays.default ];
+          };
+        in
+        {
+          devShells.default =
+            with pkgs;
+            mkShell {
+              inputsFrom = [ pkgs.mdcheck-ng ];
               buildInputs = [
-                rustc
-                cargo
                 clippy
                 rust-analyzer
                 rustfmt
@@ -18,32 +30,43 @@
               # Environment variables
               RUST_SRC_PATH = rustPlatform.rustLibSrc;
             };
-            packages = let manifest = (pkgs.lib.importTOML ./Cargo.toml).package; in {
-              default = pkgs.rustPlatform.buildRustPackage {
-                pname = manifest.name;
-                version = manifest.version;
-                src = pkgs.lib.sourceFilesBySuffices (pkgs.lib.cleanSource ./.)
-                  [ "Cargo.lock" "Cargo.toml" ".rs" ];
-                cargoLock.lockFile = ./Cargo.lock;
-                nativeBuildInputs = with pkgs; [ pkg-config ];
-              };
-              doc =
-                let eval = pkgs.lib.evalModules {
-                      modules = [
-                        {
-                          options._module.args = pkgs.lib.mkOption { internal = true; };
-                          config._module.args = { inherit pkgs; };
-                          config._module.check = false;
-                        }
-                        self.nixosModules.default
-                      ];
-                    };
-                in (pkgs.nixosOptionsDoc { inherit (eval) options;}).optionsCommonMark;
+          legacyPackages.pkgsCross = lib.mapAttrs (_: val: {
+            inherit (val) mdcheck-ng;
+            pkgsStatic = {
+              # a horrible hack to avoid the whole pkgsCross.*.pkgsStatic mess
+              mdcheck-ng = val.mdcheck-ng.overrideAttrs (_: {
+                env.RUSTFLAGS = "-C target-feature=+crt-static";
+              });
             };
-            checks = {
-              module = pkgs.testers.runNixOSTest (import ./test.nix self);
-            };
+          }) pkgs.pkgsCross;
+          packages = rec {
+            default = mdcheck-ng;
+            mdcheck-ng = pkgs.mdcheck-ng;
+            doc =
+              let
+                eval = lib.evalModules {
+                  modules = [
+                    {
+                      options._module.args = lib.mkOption { internal = true; };
+                      config._module.args = { inherit pkgs; };
+                      config._module.check = false;
+                    }
+                    self.nixosModules.default
+                  ];
+                };
+              in
+              (pkgs.nixosOptionsDoc { inherit (eval) options; }).optionsCommonMark;
           };
-          inherit (nixpkgs.lib) recursiveUpdate map foldr;
-    in foldr recursiveUpdate base (map per-system systems);
+          checks = {
+            module = pkgs.testers.runNixOSTest (import ./test.nix self);
+          };
+        };
+    in
+    lib.foldr lib.recursiveUpdate { } (
+      lib.map (sys: lib.mapAttrs (_: v: { ${sys} = v; }) (per-system sys)) systems
+    )
+    // {
+      nixosModules.default = import ./module.nix self;
+      overlays.default = final: prev: { mdcheck-ng = final.callPackage ./package.nix { }; };
+    };
 }

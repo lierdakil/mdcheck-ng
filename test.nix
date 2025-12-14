@@ -1,5 +1,4 @@
-self:
-{
+self: {
   name = "module config";
   nodes.machine = {
     imports = [ self.nixosModules.default ];

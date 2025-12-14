@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: "write"
+  id-token: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,27 +16,23 @@ jobs:
     strategy:
       matrix:
         target:
-        - "x86_64-unknown-linux-musl"
-        - "aarch64-unknown-linux-musl"
+        - "default"
+        - "pkgsCross.aarch64-multiplatform-musl.pkgsStatic.mdcheck-ng"
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
-    - run: sudo apt install gcc-aarch64-linux-gnu
-      if: matrix.target == 'aarch64-unknown-linux-musl'
-    - run: rustup target add ${{ matrix.target }}
-    - uses: Swatinem/rust-cache@v2
-      with:
-        key: ${{ matrix.target }}
-    - run: cargo build --release --target=${{ matrix.target }}
+    - uses: DeterminateSystems/nix-installer-action@main
+    - run: nix build .#${{ matrix.target }}
     - run: |
-        cp target/${{ matrix.target }}/release/mdcheck-ng ./
-        tar jcf mdcheck-ng-${{ matrix.target }}.tar.bz2 mdcheck-ng mdcheck-ng.toml
+        cp --no-preserve=all result/bin/mdcheck-ng ./
+        system=$(nix eval --raw .#${{ matrix.target }}.stdenv.hostPlatform.system)
+        tar jcf mdcheck-ng-${system}.tar.bz2 mdcheck-ng mdcheck-ng.toml
     - uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.target }}
-        path: mdcheck-ng-${{ matrix.target }}.tar.bz2
+        path: mdcheck-ng-*.tar.bz2
         if-no-files-found: error
 
   release:
@@ -53,6 +50,5 @@ jobs:
         set -x
         gh release delete latest --cleanup-tag || true
         gh release create latest \
-          mdcheck-ng-x86_64-unknown-linux-musl.tar.bz2 \
-          mdcheck-ng-aarch64-unknown-linux-musl.tar.bz2 \
+          mdcheck-ng-*.tar.bz2 \
           --title "Latest build"
