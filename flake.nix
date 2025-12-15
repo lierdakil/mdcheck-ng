@@ -56,6 +56,29 @@
                 };
               in
               (pkgs.nixosOptionsDoc { inherit (eval) options; }).optionsCommonMark;
+            units =
+              let
+                eval = lib.nixosSystem {
+                  inherit pkgs;
+                  modules = [
+                    {
+                      _module.check = false;
+                      services.mdcheck-ng.enable = true;
+                      systemd.globalEnvironment = lib.mkForce { };
+                      systemd.services.mdcheck-ng.path = lib.mkForce [ ];
+                      system.stateVersion = "25.11";
+                    }
+                    self.nixosModules.default
+                  ];
+                };
+              in
+              pkgs.symlinkJoin {
+                name = "units";
+                paths = [
+                  eval.config.systemd.units."mdcheck-ng.service".unit
+                  eval.config.systemd.units."mdcheck-ng.timer".unit
+                ];
+              };
           };
           checks = {
             module = pkgs.testers.runNixOSTest (import ./test.nix self);

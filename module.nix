@@ -113,10 +113,12 @@ in
   };
   config = lib.mkIf conf.enable {
     systemd.timers.mdcheck-ng = {
+      description = "Periodically runs mdcheck-ng";
       wantedBy = [ "timers.target" ];
       timerConfig.OnCalendar = conf.runSchedule;
     };
     systemd.services.mdcheck-ng = {
+      description = "Controller for mdraid check process";
       restartIfChanged = false;
       serviceConfig = {
         ExecStart =
