@@ -1,8 +1,10 @@
 [Unit]
-Description="Controller for mdraid check process"
+Description=Controller for mdraid check process
 
 [Service]
+Environment="RUST_LOG=error"
+X-RestartIfChanged=false
+ExecStart=/path/to/mdcheck-ng /path/to/mdcheck-ng.toml
 Type=oneshot
 User=root
 WorkingDirectory=/var/lib/mdcheck-ng
-ExecStart=/path/to/mdcheck-ng /path/to/mdcheck-ng.toml
