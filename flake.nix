@@ -42,43 +42,11 @@
           packages = rec {
             default = mdcheck-ng;
             mdcheck-ng = pkgs.mdcheck-ng;
-            doc =
-              let
-                eval = lib.evalModules {
-                  modules = [
-                    {
-                      options._module.args = lib.mkOption { internal = true; };
-                      config._module.args = { inherit pkgs; };
-                      config._module.check = false;
-                    }
-                    self.nixosModules.default
-                  ];
-                };
-              in
-              (pkgs.nixosOptionsDoc { inherit (eval) options; }).optionsCommonMark;
-            units =
-              let
-                eval = lib.nixosSystem {
-                  inherit pkgs;
-                  modules = [
-                    {
-                      _module.check = false;
-                      services.mdcheck-ng.enable = true;
-                      systemd.globalEnvironment = lib.mkForce { };
-                      systemd.services.mdcheck-ng.path = lib.mkForce [ ];
-                      system.stateVersion = "25.11";
-                    }
-                    self.nixosModules.default
-                  ];
-                };
-              in
-              pkgs.symlinkJoin {
-                name = "units";
-                paths = [
-                  eval.config.systemd.units."mdcheck-ng.service".unit
-                  eval.config.systemd.units."mdcheck-ng.timer".unit
-                ];
-              };
+            doc = pkgs.callPackage ./doc.nix { module = self.nixosModules.default; };
+            units = pkgs.callPackage ./units.nix {
+              module = self.nixosModules.default;
+              nixosSystem = lib.nixosSystem;
+            };
           };
           checks = {
             module = pkgs.testers.runNixOSTest (import ./test.nix self);
