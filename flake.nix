@@ -30,6 +30,7 @@
               # Environment variables
               RUST_SRC_PATH = rustPlatform.rustLibSrc;
             };
+          legacyPackages.pkgsStatic.mdcheck-ng = pkgs.pkgsStatic.mdcheck-ng;
           legacyPackages.pkgsCross = lib.mapAttrs (_: val: {
             inherit (val) mdcheck-ng;
             pkgsStatic = {

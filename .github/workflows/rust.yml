@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         target:
-        - "default"
+        - "pkgsStatic.mdcheck-ng"
         - "pkgsCross.aarch64-multiplatform-musl.pkgsStatic.mdcheck-ng"
 
     runs-on: ubuntu-latest
